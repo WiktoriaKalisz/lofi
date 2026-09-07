@@ -20,10 +20,13 @@ type YouTubePlayer = {
   playVideo: () => void
   destroy: () => void
   loadPlaylist?: (options: { list: string; listType?: string }) => void
+  getVideoData?: () => { title?: string }
+  getVideoUrl?: () => string
 }
 
 type YouTubePlayerState = {
   ENDED: number
+  PLAYING: number
 }
 
 type YouTubeNamespace = {
@@ -75,6 +78,12 @@ const getPlaylistConfig = (url: string) => {
 }
 
 const stations: Station[] = [
+  { name: 'Naruto', subtitle: 'for running toward your next chapter', category: 'anime', images: ['/covers/naruto.png'], cover: '/covers/naruto.png', videoId: 'sNjtroPFQ1s' },
+  { name: 'Witcher', subtitle: 'for monster contracts, silver swords, and bad choices', category: 'games', images: ['/covers/witcher.jpg'], cover: '/covers/witcher.jpg', videoId: 'i1qjKo6Ts60' },
+  { name: 'Machinarium', subtitle: 'for tiny adventures in a rusted world', category: 'games', images: ['/covers/machinarium.png'], cover: '/covers/machinarium.png', videoId: 'jex5rtwx94k' },
+  { name: 'Transistor', subtitle: 'for neon nights and things left unsaid', category: 'games', images: ['/covers/transistor.jpg'], cover: '/covers/transistor.jpg', videoId: '-XR6wiVIfW8' },
+  { name: 'Oblivion', subtitle: 'for getting lost somewhere you used to know', category: 'games', images: ['/covers/oblivion.jpg'], cover: '/covers/oblivion.jpg', videoId: 'Dil9i9gOeB0' },
+  { name: "Baldur's Gate 3", subtitle: 'for questionable parties and questionable decisions', category: 'games', images: ['/covers/all-game.jpg'], cover: '/covers/baldurs-gate-3.jpg', videoId: '3djZ6rgdHhE' },
   { name: 'Borderlands 2', subtitle: 'for questionable decisions and louder explosions', category: 'games', images: ['/covers/borderlands-2.jpg'], videoId: '4xDzrJKXOOY' },
   { name: 'Bloodlines', subtitle: 'for staying up way too late', category: 'games', images: ['/covers/bloodlines.jpg'], cover: '/covers/bloodlines.jpg', videoId: 'jfKfPfyJRdk' },
   { name: 'Starcraft 2', subtitle: 'for when procrastination is no longer an option', category: 'games', images: ['/covers/starcraft-2.jpg'], videoId: 'jfKfPfyJRdk' },
@@ -118,6 +127,18 @@ const stationEmbedUrl = (station: Station | null): string => {
 
   return station.name === 'Bloodlines'
     ? 'https://www.youtube.com/embed/videoseries?list=PLfzW_wEeYxk6xZzzUQIJnunXj98WGFb07&autoplay=1&loop=1&playlist=PLfzW_wEeYxk6xZzzUQIJnunXj98WGFb07&rel=0'
+    : station.name === 'Naruto'
+      ? 'https://www.youtube.com/embed/videoseries?list=PLF7A13C44809B5893&autoplay=1&loop=1&playlist=PLF7A13C44809B5893&rel=0'
+    : station.name === 'Witcher'
+      ? 'https://www.youtube.com/embed/videoseries?list=PL1ij2T_0HM3TnXecXuyqMgYUB5sHyY1ri&autoplay=1&loop=1&playlist=PL1ij2T_0HM3TnXecXuyqMgYUB5sHyY1ri&rel=0'
+    : station.name === 'Machinarium'
+      ? 'https://www.youtube.com/embed/videoseries?list=PLDF2E3F105D56FCE6&autoplay=1&loop=1&playlist=PLDF2E3F105D56FCE6&rel=0'
+    : station.name === 'Transistor'
+      ? 'https://www.youtube.com/embed/videoseries?list=OLAK5uy_mnwVuDUDzpdoyOpy1bbkuKjs3b2AM0L2k&autoplay=1&loop=1&playlist=OLAK5uy_mnwVuDUDzpdoyOpy1bbkuKjs3b2AM0L2k&rel=0'
+    : station.name === 'Oblivion'
+      ? 'https://www.youtube.com/embed/videoseries?list=PLkyE8Mq1liW38nRM6pXzj00RhEFJRqDJE&autoplay=1&loop=1&playlist=PLkyE8Mq1liW38nRM6pXzj00RhEFJRqDJE&rel=0'
+    : station.name === "Baldur's Gate 3"
+      ? 'https://www.youtube.com/embed/3djZ6rgdHhE?list=RD3djZ6rgdHhE&autoplay=1&loop=1&playlist=RD3djZ6rgdHhE&rel=0'
     : station.name === 'Borderlands 2'
       ? 'https://www.youtube.com/embed/videoseries?list=PLQuh_X6WPn3cvu8kdAogVfbxZWqfrb87J&autoplay=1&loop=1&playlist=PLQuh_X6WPn3cvu8kdAogVfbxZWqfrb87J&rel=0'
       : station.name === 'Starcraft 2'
@@ -139,7 +160,7 @@ const stationEmbedUrl = (station: Station | null): string => {
                       : station.name === 'Scavengers Reign'
                         ? 'https://www.youtube.com/embed/videoseries?list=PLRW80bBvVD3WkbW85kHaVD-a-xe2vSZ6R&autoplay=1&loop=1&playlist=PLRW80bBvVD3WkbW85kHaVD-a-xe2vSZ6R&rel=0'
                         : station.name === 'Cowboy Bebop'
-                          ? 'https://www.youtube.com/embed?listType=search&list=Cowboy+Bebop+OST&autoplay=1&loop=1&rel=0'
+                          ? 'https://www.youtube.com/embed/videoseries?list=PL65E33789AA7052BC&autoplay=1&loop=1&playlist=PL65E33789AA7052BC&rel=0'
                           : station.name === 'Pulp Fiction'
                             ? 'https://www.youtube.com/embed/videoseries?list=PLF4C445D6E234A0F6&autoplay=1&loop=1&playlist=PLF4C445D6E234A0F6&rel=0'
                             : station.name === 'Saturday Night Fever'
@@ -169,6 +190,14 @@ function App() {
   const [stageGif, setStageGif] = useState('')
   const [collectionQueue, setCollectionQueue] = useState<string[]>([])
   const [collectionIndex, setCollectionIndex] = useState(0)
+  const [trackTitle, setTrackTitle] = useState('')
+  const [theme, setTheme] = useState<'dark' | 'light'>(
+    () => (localStorage.getItem('lofi-theme') as 'dark' | 'light' | null) ?? 'dark',
+  )
+
+  useEffect(() => {
+    localStorage.setItem('lofi-theme', theme)
+  }, [theme])
 
   const iframeRef = useRef<HTMLIFrameElement>(null)
   const playerRef = useRef<YouTubePlayer | null>(null)
@@ -196,6 +225,7 @@ function App() {
   const openStation = (station: Station) => {
     setActiveStation(station)
     setStageGif((currentGif) => randomGif(currentGif))
+    setTrackTitle('')
 
     if (station.collection) {
       const queue = station.name === 'All Stations'
@@ -297,6 +327,34 @@ function App() {
   useEffect(() => {
     if (!activeStation) return
 
+    let disposed = false
+    let lastVideoId = ''
+
+    const pollTitle = () => {
+      const videoUrl = playerRef.current?.getVideoUrl?.()
+      const videoId = videoUrl?.match(/[?&]v=([^&]+)/)?.[1]
+      if (!videoId || videoId === lastVideoId) return
+      lastVideoId = videoId
+
+      fetch(`https://www.youtube.com/oembed?url=${encodeURIComponent(`https://www.youtube.com/watch?v=${videoId}`)}&format=json`)
+        .then((response) => (response.ok ? response.json() : null))
+        .then((data) => {
+          if (disposed || !data?.title) return
+          setTrackTitle(data.title)
+        })
+        .catch(() => {})
+    }
+
+    const intervalId = window.setInterval(pollTitle, 1000)
+    return () => {
+      disposed = true
+      window.clearInterval(intervalId)
+    }
+  }, [activeStation])
+
+  useEffect(() => {
+    if (!activeStation) return
+
     stageRef.current?.focus()
 
     const onKeyDown = (event: KeyboardEvent) => {
@@ -316,11 +374,30 @@ function App() {
   }, [activeStation?.name])
 
   return (
-    <main className="app">
+    <main className="app" data-theme={theme}>
       <header className="bar">
         <span className="live"><i /> Wowa cozy soundtrack</span>
         <span className="greeting">Have a cozy day &amp; happy listening 🧋</span>
-        <span className="count">{visibleStations.length} stations</span>
+        <button
+          type="button"
+          className="theme-toggle"
+          onClick={() => setTheme((current) => (current === 'dark' ? 'light' : 'dark'))}
+          aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+        >
+          <svg className="pixel-icon" viewBox="0 0 16 16" aria-hidden="true" shapeRendering="crispEdges">
+            {theme === 'dark' ? (
+              <>
+                <path fill="currentColor" d="M7 0h2v2H7zM7 14h2v2H7zM0 7h2v2H0zM14 7h2v2h-2zM2 2h2v2H2zM12 2h2v2h-2zM2 12h2v2H2zM12 12h2v2h-2z" />
+                <path fill="currentColor" d="M5 4h6v1h1v2h1v2h-1v2h-1v1H5v-1H4V9H3V7h1V5h1z" />
+              </>
+            ) : (
+              <>
+                <path fill="currentColor" d="M7 1h4v1h2v2h2v8h-2v2h-2v1H7v-1H5v-2H3v-2H2V5h1V3h2V1h2z" />
+                <path fill="var(--bg)" d="M9 3h2v1h1v2h1v4h-1v2h-1v1H9v-2h1V9h1V6h-1V4H9z" />
+              </>
+            )}
+          </svg>
+        </button>
       </header>
 
       <nav className="tabs">
@@ -354,7 +431,7 @@ function App() {
           <div className="stage-info">
             <span className="live"><i /> live</span>
             <h1>{activeStation.name}</h1>
-            <p>{activeStation.subtitle}</p>
+            <p>{trackTitle || activeStation.subtitle}</p>
           </div>
           <p className="hint">
             <kbd>A</kbd> random track <span>·</span> <kbd>G</kbd> random GIF ({sharedGifs.length}) <span>·</span> <kbd>Esc</kbd> back
