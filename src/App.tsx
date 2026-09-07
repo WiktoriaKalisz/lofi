@@ -83,7 +83,7 @@ const stations: Station[] = [
   { name: 'Machinarium', subtitle: 'for tiny adventures in a rusted world', category: 'games', images: ['/covers/machinarium.png'], cover: '/covers/machinarium.png', videoId: 'jex5rtwx94k' },
   { name: 'Transistor', subtitle: 'for neon nights and things left unsaid', category: 'games', images: ['/covers/transistor.jpg'], cover: '/covers/transistor.jpg', videoId: '-XR6wiVIfW8' },
   { name: 'Oblivion', subtitle: 'for getting lost somewhere you used to know', category: 'games', images: ['/covers/oblivion.jpg'], cover: '/covers/oblivion.jpg', videoId: 'Dil9i9gOeB0' },
-  { name: "Baldur's Gate 3", subtitle: 'for questionable parties and questionable decisions', category: 'games', images: ['/covers/all-game.jpg'], cover: '/covers/baldurs-gate-3.jpg', videoId: '3djZ6rgdHhE' },
+  { name: "Baldur's Gate 3", subtitle: 'for questionable parties and questionable decisions', category: 'games', images: ['/covers/all-game.jpg'], cover: '/covers/baldurs-gate-3.jpg', videoId: 'Vofkw9-O18c' },
   { name: 'Borderlands 2', subtitle: 'for questionable decisions and louder explosions', category: 'games', images: ['/covers/borderlands-2.jpg'], videoId: '4xDzrJKXOOY' },
   { name: 'Bloodlines', subtitle: 'for staying up way too late', category: 'games', images: ['/covers/bloodlines.jpg'], cover: '/covers/bloodlines.jpg', videoId: 'jfKfPfyJRdk' },
   { name: 'Starcraft 2', subtitle: 'for when procrastination is no longer an option', category: 'games', images: ['/covers/starcraft-2.jpg'], videoId: 'jfKfPfyJRdk' },
@@ -138,7 +138,7 @@ const stationEmbedUrl = (station: Station | null): string => {
     : station.name === 'Oblivion'
       ? 'https://www.youtube.com/embed/videoseries?list=PLkyE8Mq1liW38nRM6pXzj00RhEFJRqDJE&autoplay=1&loop=1&playlist=PLkyE8Mq1liW38nRM6pXzj00RhEFJRqDJE&rel=0'
     : station.name === "Baldur's Gate 3"
-      ? 'https://www.youtube.com/embed/3djZ6rgdHhE?list=RD3djZ6rgdHhE&autoplay=1&loop=1&playlist=RD3djZ6rgdHhE&rel=0'
+      ? 'https://www.youtube.com/embed/videoseries?list=PLi1CK-rsvz1Nfz83RMBp_9YaIgBWd0l9x&autoplay=1&loop=1&playlist=PLi1CK-rsvz1Nfz83RMBp_9YaIgBWd0l9x&rel=0'
     : station.name === 'Borderlands 2'
       ? 'https://www.youtube.com/embed/videoseries?list=PLQuh_X6WPn3cvu8kdAogVfbxZWqfrb87J&autoplay=1&loop=1&playlist=PLQuh_X6WPn3cvu8kdAogVfbxZWqfrb87J&rel=0'
       : station.name === 'Starcraft 2'
