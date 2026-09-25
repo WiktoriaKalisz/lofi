@@ -61,6 +61,44 @@ const gifModules = import.meta.glob('./assets/gifs/*.{gif,GIF}', {
 })
 const sharedGifs = Object.values(gifModules) as string[]
 
+const catModules = import.meta.glob('./assets/cats/*.{gif,GIF}', {
+  eager: true,
+  import: 'default',
+  query: '?url',
+})
+const catGifs = Object.fromEntries(
+  Object.entries(catModules).map(([path, url]) => [path.split('/').pop(), url as string]),
+) as Record<string, string>
+const regularCatActions = ['breathing', 'licking', 'licking', 'sitting', 'walking', 'walking'] as const
+const jumpDistance = 28
+const catNames = ['latte', 'chai'] as const
+type CatAction = 'breathing' | 'jumping' | 'licking' | 'playing' | 'sitting' | 'walking'
+type CatState = {
+  action: CatAction
+  position: number
+  direction: -1 | 1
+  transitionSeconds: number
+  nextReaction: 'jumping' | 'playing'
+  walksRemaining: number
+}
+
+const catGif = (action: CatAction) => catGifs[`siamese-${action}.gif`]
+const nextRegularCatState = (cat: CatState): CatState => {
+  const action = regularCatActions[Math.floor(Math.random() * regularCatActions.length)]
+  if (action !== 'walking') return { ...cat, action, transitionSeconds: 0 }
+
+  const direction = cat.position >= 99 ? -1 : cat.position <= 1 ? 1 : cat.direction
+  const position = direction === 1 ? 100 : 0
+  return {
+    ...cat,
+    action,
+    position,
+    direction,
+    transitionSeconds: Math.max(2, Math.abs(position - cat.position) * 0.08),
+    walksRemaining: 2 + Math.floor(Math.random() * 2),
+  }
+}
+
 if (typeof window !== 'undefined') {
   sharedGifs.forEach((gifUrl) => {
     const img = new Image()
@@ -187,6 +225,10 @@ const categoryCollectionQueue = (category: Category | 'all') =>
 function App() {
   const [activeStation, setActiveStation] = useState<Station | null>(null)
   const [activeTab, setActiveTab] = useState<Category | 'all'>('all')
+  const [cats, setCats] = useState<CatState[]>([
+    { action: 'breathing', position: 20, direction: 1, transitionSeconds: 0, nextReaction: 'jumping', walksRemaining: 0 },
+    { action: 'licking', position: 70, direction: -1, transitionSeconds: 0, nextReaction: 'playing', walksRemaining: 0 },
+  ])
   const [stageGif, setStageGif] = useState('')
   const [collectionQueue, setCollectionQueue] = useState<string[]>([])
   const [collectionIndex, setCollectionIndex] = useState(0)
@@ -194,14 +236,39 @@ function App() {
   const [theme, setTheme] = useState<'dark' | 'light'>(
     () => (localStorage.getItem('lofi-theme') as 'dark' | 'light' | null) ?? 'dark',
   )
+  const catLoungeRef = useRef<HTMLDivElement>(null)
+  const catRefs = useRef<(HTMLButtonElement | null)[]>([])
+  const iframeRef = useRef<HTMLIFrameElement>(null)
+  const playerRef = useRef<YouTubePlayer | null>(null)
+  const stageRef = useRef<HTMLElement>(null)
 
   useEffect(() => {
     localStorage.setItem('lofi-theme', theme)
   }, [theme])
 
-  const iframeRef = useRef<HTMLIFrameElement>(null)
-  const playerRef = useRef<YouTubePlayer | null>(null)
-  const stageRef = useRef<HTMLElement>(null)
+  const catActionKey = cats.map((cat) => cat.action).join('|')
+
+  useEffect(() => {
+    const actions = catActionKey.split('|') as CatAction[]
+    const timers = actions.map((action, catIndex) => {
+      if (action === 'walking') return undefined
+      const delay = action === 'jumping'
+        ? 900
+        : action === 'playing'
+          ? 1300
+          : 3500 + Math.random() * 3000
+
+      return window.setTimeout(() => {
+        setCats((currentCats) => currentCats.map((cat, index) => (
+          index === catIndex ? nextRegularCatState(cat) : cat
+        )))
+      }, delay)
+    })
+
+    return () => timers.forEach((timer) => {
+      if (timer !== undefined) window.clearTimeout(timer)
+    })
+  }, [catActionKey])
 
   const activeStationRef = useRef<Station | null>(null)
   const collectionQueueRef = useRef<string[]>([])
@@ -237,6 +304,53 @@ function App() {
       setCollectionQueue([])
       setCollectionIndex(0)
     }
+  }
+
+  const reactToClick = (catIndex: number) => {
+    const loungeRect = catLoungeRef.current?.getBoundingClientRect()
+    const catRect = catRefs.current[catIndex]?.getBoundingClientRect()
+    const availableWidth = loungeRect && catRect ? loungeRect.width - catRect.width : 0
+    const currentPosition = loungeRect && catRect && availableWidth > 0
+      ? ((catRect.left - loungeRect.left) / availableWidth) * 100
+      : null
+
+    setCats((currentCats) => currentCats.map((cat, index) => {
+      if (index !== catIndex) return cat
+      const action = cat.nextReaction
+      const startPosition = currentPosition ?? cat.position
+      const needsToTurn = action === 'jumping'
+        && (startPosition + cat.direction * jumpDistance > 100 || startPosition + cat.direction * jumpDistance < 0)
+      const direction = needsToTurn ? (cat.direction * -1 as -1 | 1) : cat.direction
+      const position = action === 'jumping'
+        ? Math.min(100, Math.max(0, startPosition + direction * jumpDistance))
+        : startPosition
+
+      return {
+        ...cat,
+        action,
+        position,
+        direction,
+        nextReaction: cat.nextReaction === 'jumping' ? 'playing' : 'jumping',
+        transitionSeconds: action === 'jumping' ? 0.36 : 0,
+        walksRemaining: 0,
+      }
+    }))
+  }
+
+  const turnCatAround = (catIndex: number) => {
+    setCats((currentCats) => currentCats.map((cat, index) => {
+      if (index !== catIndex || cat.action !== 'walking') return cat
+      if (cat.walksRemaining <= 1) return nextRegularCatState({ ...cat, walksRemaining: 0 })
+      const direction = cat.direction === 1 ? -1 : 1
+      const position = direction === 1 ? 100 : 0
+      return {
+        ...cat,
+        position,
+        direction,
+        transitionSeconds: Math.max(2, Math.abs(position - cat.position) * 0.08),
+        walksRemaining: cat.walksRemaining - 1,
+      }
+    }))
   }
 
   const baseEmbedUrl = activeStation?.collection
@@ -415,6 +529,36 @@ function App() {
             <span className="vinyl"><span className="vinyl-disc"><img src={station.cover ?? station.images[0] ?? ''} alt="" /></span></span>
             <strong>{station.name}</strong>
             <small>{station.subtitle}</small>
+          </button>
+        ))}
+      </div>
+
+      <div className="cat-lounge" ref={catLoungeRef}>
+        {cats.map((cat, catIndex) => (
+          <button
+            key={catIndex}
+            ref={(element) => { catRefs.current[catIndex] = element }}
+            type="button"
+            className={`cat cat-${cat.action} cat-facing-${cat.direction === 1 ? 'right' : 'left'}`}
+            style={{
+              left: `${cat.position}%`,
+              transform: `translateX(-${cat.position}%)`,
+              transitionDuration: `${cat.transitionSeconds}s`,
+              transitionDelay: cat.action === 'jumping' ? '0.36s' : '0s',
+            }}
+            onClick={() => reactToClick(catIndex)}
+            onTransitionEnd={(event) => {
+              if (event.propertyName === 'left') turnCatAround(catIndex)
+            }}
+            aria-label={`Play with ${catNames[catIndex]}`}
+          >
+            <img src={catGif(cat.action)} alt="" style={{ transform: `scaleX(${cat.direction})` }} />
+            {catIndex === 0 && (
+              <span className="cat-purr" aria-hidden="true">
+                <i>r</i><i>r</i><i>r</i>
+              </span>
+            )}
+            <span className={`cat-name cat-name-${catNames[catIndex]}`}>{catNames[catIndex]}</span>
           </button>
         ))}
       </div>
