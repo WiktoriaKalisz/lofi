@@ -1,18 +1,26 @@
 import { useEffect, useRef, useState } from 'react'
 import './App.css'
 
-type Category = 'chill' | 'games' | 'anime' | 'movies'
+type Category = 'chill' | 'games' | 'anime' | 'movies' | 'classic' | 'jazz' | 'retro' | 'night'
+type ProfileId = 'wowa' | 'wiki'
+type FilterId = Category | 'all'
 
 type Station = {
   name: string
   subtitle: string
   category: Category
   collection?: boolean
+  mixAll?: boolean
   images: string[]
   cover?: string
   gif?: string
-  videoId: string
+  videoId?: string
+  playlistId?: string
+  searchQuery?: string
 }
+
+type Filter = { id: FilterId; label: string }
+type Profile = { title: string; greeting: string; stations: Station[]; filters: Filter[]; gifPool: string[] }
 
 type YouTubePlayer = {
   setShuffle: (shuffle: boolean) => void
@@ -20,6 +28,7 @@ type YouTubePlayer = {
   playVideo: () => void
   destroy: () => void
   loadPlaylist?: (options: { list: string; listType?: string }) => void
+  loadVideoById: (videoId: string) => void
   getVideoData?: () => { title?: string }
   getVideoUrl?: () => string
 }
@@ -44,7 +53,7 @@ declare global {
   }
 }
 
-const tabs: { id: Category | 'all'; label: string }[] = [
+const wowaFilters: Filter[] = [
   { id: 'all', label: 'all' },
   { id: 'chill', label: 'cozy' },
   { id: 'games', label: 'games' },
@@ -53,13 +62,19 @@ const tabs: { id: Category | 'all'; label: string }[] = [
 ]
 
 // Collections leave `images` empty: their gallery is pooled from the category's other stations.
-// Add any GIF to `src/assets/gifs/`; its filename and station do not matter.
+// GIFs placed in each profile folder are loaded only for that profile.
 const gifModules = import.meta.glob('./assets/gifs/*.{gif,GIF}', {
   eager: true,
   import: 'default',
   query: '?url',
 })
-const sharedGifs = Object.values(gifModules) as string[]
+const wowaGifs = Object.values(gifModules) as string[]
+const wikiGifModules = import.meta.glob('./assets/gifs-wiki/*.{gif,GIF}', {
+  eager: true,
+  import: 'default',
+  query: '?url',
+})
+const wikiGifs = Object.values(wikiGifModules) as string[]
 
 const catModules = import.meta.glob('./assets/cats/*.{gif,GIF}', {
   eager: true,
@@ -100,7 +115,7 @@ const nextRegularCatState = (cat: CatState): CatState => {
 }
 
 if (typeof window !== 'undefined') {
-  sharedGifs.forEach((gifUrl) => {
+  [...wowaGifs, ...wikiGifs].forEach((gifUrl) => {
     const img = new Image()
     img.src = gifUrl
   })
@@ -115,7 +130,9 @@ const getPlaylistConfig = (url: string) => {
   return { list, listType }
 }
 
-const stations: Station[] = [
+const getEmbedVideoId = (url: string) => new URL(url).pathname.match(/^\/embed\/([^/]+)$/)?.[1]
+
+const wowaStations: Station[] = [
   { name: 'Naruto', subtitle: 'for running toward your next chapter', category: 'anime', images: ['/covers/naruto.png'], cover: '/covers/naruto.png', videoId: 'sNjtroPFQ1s' },
   { name: 'Witcher', subtitle: 'for monster contracts, silver swords, and bad choices', category: 'games', images: ['/covers/witcher.jpg'], cover: '/covers/witcher.jpg', videoId: 'i1qjKo6Ts60' },
   { name: 'Machinarium', subtitle: 'for tiny adventures in a rusted world', category: 'games', images: ['/covers/machinarium.png'], cover: '/covers/machinarium.png', videoId: 'jex5rtwx94k' },
@@ -146,9 +163,57 @@ const stations: Station[] = [
   { name: 'All Stations', subtitle: 'every station in one rotating mix', category: 'games', collection: true, images: ['/covers/all-game.jpg'], videoId: '5qap5aO4i9A' },
   ]
 
-const randomGif = (currentGif = '') => {
-  if (sharedGifs.length <= 1) return sharedGifs[0] ?? ''
-  const available = sharedGifs.filter((gif) => gif !== currentGif)
+const wikiFilters: Filter[] = [
+  { id: 'all', label: 'all' },
+  { id: 'classic', label: 'classic' },
+  { id: 'jazz', label: 'cozy / jazz' },
+  { id: 'retro', label: 'retro / funky' },
+  { id: 'night', label: 'relax / night' },
+]
+
+const wikiCover = (filename: string) => [encodeURI(`/covers/${filename}`)]
+
+const wikiStations: Station[] = [
+  { name: 'Oldschool', subtitle: 'The Bootleg Boy', category: 'classic', images: wikiCover('download (27).jpg'), videoId: 'p6cjcK2xG-k' },
+  { name: 'hip-hop', subtitle: 'The Bootleg Boy', category: 'classic', images: wikiCover('download (33).jpg'), videoId: 'T8uSPejF-vo' },
+  { name: 'Haze', subtitle: 'The Bootleg Boy 2', category: 'classic', images: wikiCover('download (26).jpg'), videoId: '617L_MOB37k' },
+  { name: 'Fall', subtitle: 'Chillhop Music', category: 'classic', images: wikiCover('download (32).jpg'), videoId: 'M5hZAL_hW7c' },
+  { name: 'Steezy', subtitle: 'SteezyAF', category: 'classic', images: wikiCover('🐱🕶.jpg'), videoId: 'dBlxJ4EAYhE' },
+  { name: 'Mellow', subtitle: 'chill chill journal', category: 'jazz', images: wikiCover('download (29).jpg'), videoId: '1YmClsk16_U' },
+  { name: 'morning coffee', subtitle: 'zunzunmelody', category: 'jazz', images: wikiCover('download (31).jpg'), videoId: 'Uqo9knga2CE' },
+  { name: 'Funky 80s', subtitle: 'for dancing through a neon afternoon', category: 'retro', images: wikiCover('download (28).jpg'), videoId: 'p4YZJpVeKSw' },
+  { name: 'Meowbrew', subtitle: 'for coffee breaks in a Tokyo arcade', category: 'retro', images: wikiCover('Refreshing Iced Coffee Illustration.jpg'), videoId: 'rYXVAAL_1ss' },
+  { name: 'Tokyo Stars', subtitle: 'for wandering under city lights', category: 'retro', images: wikiCover('download (24).jpg'), videoId: '7XPGU7dmZXg' },
+  { name: 'High-Rise', subtitle: 'for watching the city slow down at dusk', category: 'night', images: wikiCover('– ★.jpg'), videoId: 'rhrCG0Vtx3g' },
+  { name: 'Sunrise', subtitle: 'for taking the long way into a new day', category: 'night', images: wikiCover('🐈.jpg'), videoId: 'ot5UsNymqgQ' },
+  { name: 'Bedtime', subtitle: 'for letting the day drift away', category: 'night', images: wikiCover('download (22).jpg'), videoId: 'UJs6__K7gSY' },
+  { name: 'All Classic Lo-fi', subtitle: 'for the beats you keep coming back to', category: 'classic', collection: true, images: wikiCover('download (23).jpg') },
+  { name: 'All Jazz & Cozy Lo-fi', subtitle: 'for slow mornings and warm cups', category: 'jazz', collection: true, images: wikiCover('Illustration _ Art.jpg') },
+  { name: 'All Retro & Funky Lo-fi', subtitle: 'for neon streets and easy grooves', category: 'retro', collection: true, images: wikiCover('download (25).jpg') },
+  { name: 'All Night Lo-fi', subtitle: 'for winding down after dark', category: 'night', collection: true, images: wikiCover('download (30).jpg') },
+  { name: 'All Lo-fi', subtitle: 'every mood in one rotating mix', category: 'classic', collection: true, mixAll: true, images: wikiCover('wiki-all-lofi.jpg') },
+]
+
+const profiles: Record<ProfileId, Profile> = {
+  wowa: {
+    title: 'Wowa cozy soundtrack',
+    greeting: 'Have a cozy day & happy listening 🧋',
+    stations: wowaStations,
+    filters: wowaFilters,
+    gifPool: wowaGifs,
+  },
+  wiki: {
+    title: 'Wiki cozy soundtrack',
+    greeting: 'Have a cozy day & happy listening 🧋',
+    stations: wikiStations,
+    filters: wikiFilters,
+    gifPool: wikiGifs,
+  },
+}
+
+const randomGif = (gifPool: string[], currentGif = '') => {
+  if (gifPool.length <= 1) return gifPool[0] ?? ''
+  const available = gifPool.filter((gif) => gif !== currentGif)
   return available[Math.floor(Math.random() * available.length)] ?? ''
 }
 const shuffle = <T,>(items: T[]) => {
@@ -162,6 +227,12 @@ const shuffle = <T,>(items: T[]) => {
 
 const stationEmbedUrl = (station: Station | null): string => {
   if (!station) return ''
+  if (station.searchQuery) {
+    return `https://www.youtube.com/embed/videoseries?listType=search&list=${encodeURIComponent(station.searchQuery)}&autoplay=1&rel=0`
+  }
+  if (station.playlistId) {
+    return `https://www.youtube.com/embed/videoseries?list=${station.playlistId}&autoplay=1&loop=1&playlist=${station.playlistId}&rel=0`
+  }
 
   return station.name === 'Bloodlines'
     ? 'https://www.youtube.com/embed/videoseries?list=PLfzW_wEeYxk6xZzzUQIJnunXj98WGFb07&autoplay=1&loop=1&playlist=PLfzW_wEeYxk6xZzzUQIJnunXj98WGFb07&rel=0'
@@ -209,22 +280,23 @@ const stationEmbedUrl = (station: Station | null): string => {
                                   ? 'https://www.youtube.com/embed/videoseries?list=PLno9aC1A6f6EUARlSTxEHgwQfltpzV4mo&autoplay=1&loop=1&playlist=PLno9aC1A6f6EUARlSTxEHgwQfltpzV4mo&rel=0'
                                   : station.name === "Howl's Moving Castle"
                                     ? 'https://www.youtube.com/embed/videoseries?list=PLS_7XVer-yNAFK0Np8Ok84dbj5j03R2dB&autoplay=1&loop=1&playlist=PLS_7XVer-yNAFK0Np8Ok84dbj5j03R2dB&rel=0'
-                                    : station
+                                    : station?.videoId
                                       ? `https://www.youtube.com/embed/${station.videoId}?autoplay=1&rel=0`
                                       : ''
 }
 
-const categoryCollectionQueue = (category: Category | 'all') =>
+const categoryCollectionQueue = (category: FilterId, stations: Station[]) =>
   shuffle(
     stations
-      .filter((station) => !station.collection && (category === 'all' || station.category === category))
+      .filter((station) => !station.collection && !station.searchQuery && (category === 'all' || station.category === category))
       .map((station) => stationEmbedUrl(station))
       .filter(Boolean),
   )
 
 function App() {
+  const [activeProfile, setActiveProfile] = useState<ProfileId>('wowa')
   const [activeStation, setActiveStation] = useState<Station | null>(null)
-  const [activeTab, setActiveTab] = useState<Category | 'all'>('all')
+  const [activeTab, setActiveTab] = useState<FilterId>('all')
   const [cats, setCats] = useState<CatState[]>([
     { action: 'breathing', position: 20, direction: 1, transitionSeconds: 0, nextReaction: 'jumping', walksRemaining: 0 },
     { action: 'licking', position: 70, direction: -1, transitionSeconds: 0, nextReaction: 'playing', walksRemaining: 0 },
@@ -241,6 +313,7 @@ function App() {
   const iframeRef = useRef<HTMLIFrameElement>(null)
   const playerRef = useRef<YouTubePlayer | null>(null)
   const stageRef = useRef<HTMLElement>(null)
+  const profile = profiles[activeProfile]
 
   useEffect(() => {
     localStorage.setItem('lofi-theme', theme)
@@ -280,7 +353,7 @@ function App() {
     collectionIndexRef.current = collectionIndex
   }, [activeStation, collectionQueue, collectionIndex])
 
-  const visibleStations = stations
+  const visibleStations = profile.stations
     .filter((station) => {
       if (station.name === 'All Stations') return false
       if (activeTab === 'all') return true
@@ -291,13 +364,13 @@ function App() {
 
   const openStation = (station: Station) => {
     setActiveStation(station)
-    setStageGif((currentGif) => randomGif(currentGif))
+    setStageGif((currentGif) => randomGif(profile.gifPool, currentGif))
     setTrackTitle('')
 
     if (station.collection) {
-      const queue = station.name === 'All Stations'
-        ? categoryCollectionQueue('all')
-        : categoryCollectionQueue(station.category)
+      const queue = station.mixAll || station.name === 'All Stations'
+        ? categoryCollectionQueue('all', profile.stations)
+        : categoryCollectionQueue(station.category, profile.stations)
       setCollectionQueue(queue)
       setCollectionIndex(0)
     } else {
@@ -354,12 +427,10 @@ function App() {
   }
 
   const baseEmbedUrl = activeStation?.collection
-    ? collectionQueue[collectionIndex] ?? ''
+    ? collectionQueue[0] ?? ''
     : stationEmbedUrl(activeStation)
   const hasPlaylist = baseEmbedUrl.includes('list=')
-  const embedUrl = hasPlaylist
-    ? `${baseEmbedUrl}&enablejsapi=1`
-    : baseEmbedUrl
+  const embedUrl = baseEmbedUrl ? `${baseEmbedUrl}&enablejsapi=1` : ''
 
   const playNextTrack = () => {
     const station = activeStationRef.current
@@ -368,15 +439,19 @@ function App() {
 
     if (station?.collection && queue.length > 0) {
       const nextIndex = (collectionIndexRef.current + 1) % queue.length
-      setCollectionIndex(nextIndex)
       const nextUrl = queue[nextIndex]
       const config = getPlaylistConfig(nextUrl)
 
       if (config && player && typeof player.loadPlaylist === 'function') {
+        setCollectionIndex(nextIndex)
         player.loadPlaylist(config)
         player.setShuffle(true)
         player.playVideo()
+      } else if (player && getEmbedVideoId(nextUrl)) {
+        setCollectionIndex(nextIndex)
+        player.loadVideoById(getEmbedVideoId(nextUrl)!)
       } else if (player) {
+        setCollectionIndex(nextIndex)
         player.setShuffle(true)
         player.nextVideo()
         player.playVideo()
@@ -402,8 +477,10 @@ function App() {
           onReady: () => {
             if (disposed) return
             playerRef.current = player ?? null
-            player?.setShuffle(true)
-            player?.nextVideo()
+            if (hasPlaylist) {
+              player?.setShuffle(true)
+              player?.nextVideo()
+            }
             player?.playVideo()
           },
           onStateChange: (event) => {
@@ -474,7 +551,7 @@ function App() {
     const onKeyDown = (event: KeyboardEvent) => {
       const key = event.key.toLowerCase()
       if (key === 'g' || event.code === 'KeyG') {
-        setStageGif((currentGif) => randomGif(currentGif))
+        setStageGif((currentGif) => randomGif(profile.gifPool, currentGif))
       } else if (key === 'a' || event.code === 'KeyA') {
         playNextTrack()
       } else if (key === 'escape' || event.code === 'Escape') {
@@ -485,13 +562,33 @@ function App() {
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeStation?.name])
+  }, [activeStation?.name, activeProfile])
 
   return (
     <main className="app" data-theme={theme}>
       <header className="bar">
-        <span className="live"><i /> Wowa cozy soundtrack</span>
-        <span className="greeting">Have a cozy day &amp; happy listening 🧋</span>
+        <span className="live"><i /> {profile.title}</span>
+        <span className="greeting">{profile.greeting}</span>
+        <div className="profile-switch" role="group" aria-label="Choose listening room">
+          {(['wowa', 'wiki'] as const).map((profileId) => (
+            <button
+              key={profileId}
+              type="button"
+              className={profileId === activeProfile ? 'profile-option active' : 'profile-option'}
+              aria-pressed={profileId === activeProfile}
+              onClick={() => {
+                setActiveProfile(profileId)
+                setActiveStation(null)
+                setStageGif('')
+                setActiveTab('all')
+                setCollectionQueue([])
+                setCollectionIndex(0)
+              }}
+            >
+              {profileId === 'wowa' ? 'Wowa' : 'Wiki'}
+            </button>
+          ))}
+        </div>
         <button
           type="button"
           className="theme-toggle"
@@ -515,7 +612,7 @@ function App() {
       </header>
 
       <nav className="tabs">
-        {tabs.map((tab) => (
+        {profile.filters.map((tab) => (
           <button key={tab.id} type="button" className={tab.id === activeTab ? 'tab active' : 'tab'} onClick={() => setActiveTab(tab.id)}>
             {tab.label}
           </button>
@@ -526,7 +623,9 @@ function App() {
         {visibleStations.map((station) => (
           <button key={station.name} type="button" className="card" onClick={() => openStation(station)}>
             {station.collection && <span className="badge">mix</span>}
-            <span className="vinyl"><span className="vinyl-disc"><img src={station.cover ?? station.images[0] ?? ''} alt="" /></span></span>
+            <span className="vinyl"><span className="vinyl-disc">
+              {(station.cover ?? station.images[0]) && <img src={station.cover ?? station.images[0]} alt="" />}
+            </span></span>
             <strong>{station.name}</strong>
             <small>{station.subtitle}</small>
           </button>
@@ -578,7 +677,7 @@ function App() {
             <p>{trackTitle || activeStation.subtitle}</p>
           </div>
           <p className="hint">
-            <kbd>A</kbd> random track <span>·</span> <kbd>G</kbd> random GIF ({sharedGifs.length}) <span>·</span> <kbd>Esc</kbd> back
+            <kbd>A</kbd> random track <span>·</span> <kbd>G</kbd> random GIF ({profile.gifPool.length}) <span>·</span> <kbd>Esc</kbd> back
           </p>
         </section>
       )}
